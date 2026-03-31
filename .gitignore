@@ -1,0 +1,20 @@
+# Audit results (screenshots)
+audit-results/
+
+# Environment files
+.env
+.env.local
+.env.production
+
+# Node
+node_modules/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo

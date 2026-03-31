@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "cloud-eyes": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@playwright/mcp@latest",
+        "--cdp-endpoint",
+        "wss://YOUR_CLOUD_BROWSER_URL?token=YOUR_TOKEN"
+      ]
+    }
+  }
+}

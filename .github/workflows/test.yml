@@ -1,0 +1,58 @@
+name: cloud-eyes CI
+
+on:
+  push:
+    branches: [main, claude/*]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    services:
+      browser:
+        image: ghcr.io/browserless/chromium:latest
+        ports:
+          - 3000:3000
+        env:
+          TOKEN: ci-test-token
+          CONCURRENT: 2
+          TIMEOUT: 30000
+        options: >-
+          --shm-size=2g
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Wait for Browserless to start
+        run: |
+          echo "Waiting for Browserless to be ready..."
+          for i in $(seq 1 30); do
+            if curl -s -o /dev/null -w "%{http_code}" "http://localhost:3000/config?token=ci-test-token" | grep -q "200"; then
+              echo "Browserless is ready!"
+              break
+            fi
+            echo "  Attempt $i/30 - waiting..."
+            sleep 2
+          done
+
+      - name: Run health check
+        run: |
+          chmod +x ./scripts/health-check.sh
+          ./scripts/health-check.sh http://localhost:3000 ci-test-token
+
+      - name: Run visual audit test
+        run: |
+          chmod +x ./scripts/test-visual-audit.sh
+          ./scripts/test-visual-audit.sh https://example.com http://localhost:3000 ci-test-token
+
+      - name: Upload screenshots
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: audit-screenshots
+          path: audit-results/
+          retention-days: 7

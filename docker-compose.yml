@@ -1,0 +1,12 @@
+version: '3.8'
+services:
+  browser:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      - TOKEN=local-dev-token
+      - CONCURRENT=5
+      - TIMEOUT=60000
+    shm_size: '2g'
+    restart: unless-stopped
