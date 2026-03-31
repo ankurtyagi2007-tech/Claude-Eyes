@@ -62,21 +62,27 @@ Works from claude.ai/code on your phone, tablet, or any browser.
 
 1. Create an account at [browserless.io](https://www.browserless.io)
 2. Copy your API token from the dashboard
-3. Add this MCP config to Claude Code:
+3. Add the MCP server to Claude Code:
 
-```json
-{
-  "mcpServers": {
-    "cloud-eyes": {
-      "command": "npx",
-      "args": [
-        "-y", "@playwright/mcp@latest",
-        "--cdp-endpoint", "wss://production-sfo.browserless.io/chromium/playwright?token=YOUR_BROWSERLESS_TOKEN"
-      ]
-    }
-  }
-}
-```
+   **If you use Claude Code in the browser (claude.ai/code):**
+   Add it through the **Settings UI** - not a file. See [Claude Code in Browser](#claude-code-in-browser-claudeaicode) below for step-by-step instructions. Files written during browser sessions are ephemeral and will not persist.
+
+   **If you use Claude Code CLI or Desktop:**
+   Add this to your MCP config file:
+
+   ```json
+   {
+     "mcpServers": {
+       "cloud-eyes": {
+         "command": "npx",
+         "args": [
+           "-y", "@playwright/mcp@latest",
+           "--cdp-endpoint", "wss://production-sfo.browserless.io/chromium/playwright?token=YOUR_BROWSERLESS_TOKEN"
+         ]
+       }
+     }
+   }
+   ```
 
 4. Tell Claude: "audit my website at https://your-site.com"
 
@@ -209,7 +215,28 @@ Copy `examples/mcp-config-claude-desktop.json` into your Claude Desktop config f
 
 ### Claude Code in Browser (claude.ai/code)
 
-For browser-based Claude Code, add the MCP server configuration through the Claude Code settings panel. The Playwright MCP server will run as a remote tool bridge.
+Browser sessions run in an ephemeral sandbox. Files like `~/.claude/mcp.json` or `.mcp.json` written during a session are destroyed when the session ends. You must add the MCP server through the **settings UI** so it persists on your account.
+
+**Step-by-step:**
+
+1. Open [claude.ai/code](https://claude.ai/code) in your browser
+2. Click the **hamburger menu** (three lines, top-left) or open **Settings**
+3. Navigate to **MCP Servers** (sometimes under "Integrations" or "Tools")
+4. Click **Add MCP Server** (or "Add Custom Server")
+5. Fill in the fields:
+   - **Name:** `cloud-eyes`
+   - **Command:** `npx`
+   - **Arguments:** `-y`, `@playwright/mcp@latest`, `--cdp-endpoint`, `wss://production-sfo.browserless.io/chromium/playwright?token=YOUR_BROWSERLESS_TOKEN`
+6. Save
+
+The server is now tied to your **account**, not to a session or project. Every new session in any repo will have the Playwright tools available.
+
+**Verify it worked:** Start a new session and look for tools like `playwright_navigate`, `playwright_screenshot`, `playwright_click` in the available tools. If they are there, say "audit my website at https://your-site.com" and it will work.
+
+**Common mistakes:**
+- Writing `~/.claude/mcp.json` inside a browser session - this file is destroyed when the session ends
+- Writing `.mcp.json` in a project directory during a browser session - same problem, the sandbox is ephemeral
+- Adding the config through Claude asking you to "create a file" instead of through the settings UI
 
 ---
 
