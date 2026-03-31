@@ -53,11 +53,12 @@ cloud-eyes gives Claude Code a cloud-hosted browser it can control via the Playw
 
 ## Quickstart
 
-Four paths. Pick the one that fits.
+Four paths. **Path A is for most people** - especially if you use Claude Code in the browser (claude.ai/code) or on your phone. Zero installs. Paths B-D are for developers who have a terminal and want to self-host.
 
-### Path A: Browserless Cloud (fastest, free tier available)
+### Path A: Browserless Cloud (recommended - works from phone/browser)
 
-No infrastructure to manage. Sign up, get a token, connect.
+No installs. No CLI. No Docker. No terminal. Just a browser and a token.
+Works from claude.ai/code on your phone, tablet, or any browser.
 
 1. Create an account at [browserless.io](https://www.browserless.io)
 2. Copy your API token from the dashboard
@@ -83,7 +84,9 @@ Done. No Docker. No deploy. No server.
 
 ---
 
-### Path B: Self-host on Fly.io (~5 min)
+### Path B: Self-host on Fly.io (~5 min, requires terminal)
+
+> Requires a terminal with `flyctl` installed. Skip this if you only use Claude Code in the browser.
 
 You own the browser. No third-party dependency.
 
@@ -120,7 +123,9 @@ Then add the MCP config:
 
 ---
 
-### Path C: Self-host on Railway (~3 min)
+### Path C: Self-host on Railway (~3 min, requires terminal)
+
+> Requires a terminal with Railway CLI installed. Skip this if you only use Claude Code in the browser.
 
 One-click deploy with Railway.
 
@@ -152,7 +157,9 @@ Then add the same MCP config with your Railway URL:
 
 ---
 
-### Path D: Local Docker (for testing)
+### Path D: Local Docker (for testing, requires terminal + Docker)
+
+> Requires a terminal with Docker installed. Skip this if you only use Claude Code in the browser.
 
 Spin up Browserless locally to test before deploying.
 
