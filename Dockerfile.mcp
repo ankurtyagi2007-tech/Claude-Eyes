@@ -1,0 +1,14 @@
+FROM mcr.microsoft.com/playwright/mcp:latest
+
+# Port for HTTP/SSE transport
+ENV PORT=8931
+
+# Browserless CDP endpoint - override this in production
+ENV CDP_ENDPOINT="wss://production-sfo.browserless.io/chromium/playwright?token=YOUR_TOKEN"
+
+EXPOSE 8931
+
+HEALTHCHECK --interval=30s --timeout=10s --retries=3 \
+  CMD curl -f http://localhost:${PORT}/sse || exit 1
+
+CMD ["sh", "-c", "npx @playwright/mcp@latest --port ${PORT} --host 0.0.0.0 --allowed-hosts '*' --cdp-endpoint ${CDP_ENDPOINT}"]
