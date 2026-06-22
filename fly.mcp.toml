@@ -1,0 +1,26 @@
+app = "cloud-eyes-mcp"
+primary_region = "sjc"
+
+[build]
+  dockerfile = "Dockerfile.mcp"
+
+[env]
+  PORT = "8931"
+
+[http_service]
+  internal_port = 8931
+  force_https = true
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  min_machines_running = 0
+
+[[http_service.checks]]
+  grace_period = "30s"
+  interval = "30s"
+  method = "GET"
+  timeout = "10s"
+  path = "/sse"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"

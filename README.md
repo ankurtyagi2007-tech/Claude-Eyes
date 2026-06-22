@@ -23,23 +23,31 @@ cloud-eyes gives Claude Code a cloud-hosted browser it can control via the Playw
 
 ## Architecture
 
+There are two different architectures depending on how you use Claude Code.
+
+### Browser / Mobile (claude.ai/code)
+
+Browser-based Claude Code cannot run local commands like `npx`. It can only connect to **remote MCP servers** via HTTP/SSE. So you need a hosted Playwright MCP server that bridges Claude Code to the cloud browser.
+
 ```
 ┌─────────────────────────────────┐
 │  Claude Code (browser / mobile) │
 └──────────────┬──────────────────┘
-               │ MCP protocol
+               │ HTTP/SSE (custom connector)
+               │ https://your-mcp-server.fly.dev/mcp
                v
 ┌──────────────────────────────┐
-│    Playwright MCP Server     │
-│  (runs as MCP tool bridge)   │
+│  Playwright MCP Server       │
+│  (hosted on Fly.io/Railway)  │
+│  Dockerfile.mcp              │
 └──────────────┬───────────────┘
                │ CDP WebSocket
-               │ wss://your-cloud-browser-url?token=XXX
+               │ wss://browserless-url?token=XXX
                v
 ┌──────────────────────────────┐
 │  Browserless Chromium        │
-│  (Docker on Fly.io/Railway/  │
-│   any VPS)                   │
+│  (browserless.io or          │
+│   self-hosted)               │
 └──────────────┬───────────────┘
                │ navigates to
                v
@@ -49,125 +57,144 @@ cloud-eyes gives Claude Code a cloud-hosted browser it can control via the Playw
 └──────────────────────────────┘
 ```
 
+### CLI / Desktop
+
+CLI and Desktop users can run `npx` locally. The Playwright MCP server runs as a local process (stdio) and connects directly to the cloud browser. No need to host the MCP server separately.
+
+```
+┌──────────────────────────────┐
+│  Claude Code CLI / Desktop   │
+└──────────────┬───────────────┘
+               │ stdio (local process)
+               v
+┌──────────────────────────────┐
+│  Playwright MCP Server       │
+│  (npx @playwright/mcp)       │
+│  runs locally on your machine│
+└──────────────┬───────────────┘
+               │ CDP WebSocket
+               │ wss://browserless-url?token=XXX
+               v
+┌──────────────────────────────┐
+│  Browserless Chromium        │
+│  (browserless.io or          │
+│   self-hosted)               │
+└──────────────────────────────┘
+```
+
 ---
 
 ## Quickstart
 
-Four paths. **Path A is for most people** - especially if you use Claude Code in the browser (claude.ai/code) or on your phone. Zero installs. Paths B-D are for developers who have a terminal and want to self-host.
+### Path A: Browser / Mobile users (claude.ai/code)
 
-### Path A: Browserless Cloud (recommended - works from phone/browser)
+This is the path for people who use Claude Code in the browser or on their phone. You need two things: a cloud browser and a hosted MCP server.
 
-No installs. No CLI. No Docker. No terminal. Just a browser and a token.
-Works from claude.ai/code on your phone, tablet, or any browser.
+**Step 1: Get a cloud browser**
 
 1. Create an account at [browserless.io](https://www.browserless.io)
 2. Copy your API token from the dashboard
-3. Add the MCP server to Claude Code:
+3. Your CDP endpoint is: `wss://production-sfo.browserless.io/chromium/playwright?token=YOUR_TOKEN`
 
-   **If you use Claude Code in the browser (claude.ai/code):**
-   Add it through the **Settings UI** - not a file. See [Claude Code in Browser](#claude-code-in-browser-claudeaicode) below for step-by-step instructions. Files written during browser sessions are ephemeral and will not persist.
+**Step 2: Deploy the MCP server**
 
-   **If you use Claude Code CLI or Desktop:**
-   Add this to your MCP config file:
+The MCP server is a small service that translates HTTP requests from Claude Code into browser commands. Deploy it on Fly.io:
 
-   ```json
-   {
-     "mcpServers": {
-       "cloud-eyes": {
-         "command": "npx",
-         "args": [
-           "-y", "@playwright/mcp@latest",
-           "--cdp-endpoint", "wss://production-sfo.browserless.io/chromium/playwright?token=YOUR_BROWSERLESS_TOKEN"
-         ]
-       }
-     }
-   }
-   ```
+```bash
+git clone https://github.com/ankurtyagi2007-tech/Claude-Eyes.git
+cd Claude-Eyes
+
+# Deploy the MCP server (pass your Browserless CDP endpoint)
+./scripts/deploy-mcp-fly.sh "wss://production-sfo.browserless.io/chromium/playwright?token=YOUR_TOKEN"
+```
+
+This deploys `Dockerfile.mcp` to Fly.io and prints your MCP server URL (something like `https://cloud-eyes-mcp.fly.dev`).
+
+> **No terminal?** You can also deploy `Dockerfile.mcp` from the Fly.io dashboard by connecting your GitHub repo. Set the `CDP_ENDPOINT` environment variable to your Browserless WebSocket URL.
+
+**Step 3: Add the connector in Claude Code**
+
+1. Open [claude.ai/code](https://claude.ai/code)
+2. Go to **Settings**
+3. Find **Connectors** (may also be under a **Customize** page)
+4. Click **Add custom connector**
+5. Fill in:
+   - **Name:** `cloud-eyes`
+   - **Remote MCP server URL:** `https://cloud-eyes-mcp.fly.dev/mcp`
+6. Save
+
+**Step 4: Verify**
+
+Start a new Claude Code session. You should see Playwright tools available (like `playwright_navigate`, `playwright_screenshot`). Say "audit my website at https://your-site.com" and it should work.
+
+> **Why not just a file?** Browser sessions run in ephemeral sandboxes. Files like `~/.claude/mcp.json` or `.mcp.json` written during a session are destroyed when it ends. The custom connector persists on your account.
+
+---
+
+### Path B: CLI / Desktop users
+
+You only need a cloud browser. The MCP server runs locally via `npx`.
+
+1. Create an account at [browserless.io](https://www.browserless.io)
+2. Copy your API token
+3. Add this MCP config:
+
+**Claude Code CLI** - add to `~/.claude/mcp.json` (global) or `.mcp.json` (project):
+
+```json
+{
+  "mcpServers": {
+    "cloud-eyes": {
+      "command": "npx",
+      "args": [
+        "-y", "@playwright/mcp@latest",
+        "--cdp-endpoint", "wss://production-sfo.browserless.io/chromium/playwright?token=YOUR_BROWSERLESS_TOKEN"
+      ]
+    }
+  }
+}
+```
+
+**Claude Desktop** - add to your Claude Desktop config:
+
+- macOS: `~/Library/Application Support/Claude/claude_desktop_config.json`
+- Windows: `%APPDATA%\Claude\claude_desktop_config.json`
+
+Same JSON format as above.
 
 4. Tell Claude: "audit my website at https://your-site.com"
 
-Done. No Docker. No deploy. No server.
-
 ---
 
-### Path B: Self-host on Fly.io (~5 min, requires terminal)
+### Path C: Self-host everything (~10 min, requires terminal)
 
-> Requires a terminal with `flyctl` installed. Skip this if you only use Claude Code in the browser.
+For users who want full control. Deploy both the cloud browser and the MCP server on your own infrastructure.
 
-You own the browser. No third-party dependency.
+**Deploy the cloud browser:**
 
 ```bash
-# Clone this repo
 git clone https://github.com/ankurtyagi2007-tech/Claude-Eyes.git
 cd Claude-Eyes
 
-# Deploy to Fly.io
+# Deploy Browserless to Fly.io
 ./scripts/deploy-fly.sh
+# Note the WebSocket URL it prints
 ```
 
-The script will:
-- Create a Fly app called `cloud-eyes`
-- Set a secure token as a secret
-- Deploy the Browserless container
-- Print your WebSocket URL
-
-Then add the MCP config:
-
-```json
-{
-  "mcpServers": {
-    "cloud-eyes": {
-      "command": "npx",
-      "args": [
-        "-y", "@playwright/mcp@latest",
-        "--cdp-endpoint", "wss://cloud-eyes.fly.dev?token=YOUR_TOKEN"
-      ]
-    }
-  }
-}
-```
-
----
-
-### Path C: Self-host on Railway (~3 min, requires terminal)
-
-> Requires a terminal with Railway CLI installed. Skip this if you only use Claude Code in the browser.
-
-One-click deploy with Railway.
+**Deploy the MCP server (browser users only):**
 
 ```bash
-# Clone and deploy
-git clone https://github.com/ankurtyagi2007-tech/Claude-Eyes.git
-cd Claude-Eyes
-
-./scripts/deploy-railway.sh
+# Deploy the MCP server, pointing it at your Browserless instance
+./scripts/deploy-mcp-fly.sh "wss://cloud-eyes.fly.dev?token=YOUR_TOKEN"
 ```
 
-Or use the Railway dashboard to deploy from this repo directly.
-
-Then add the same MCP config with your Railway URL:
-
-```json
-{
-  "mcpServers": {
-    "cloud-eyes": {
-      "command": "npx",
-      "args": [
-        "-y", "@playwright/mcp@latest",
-        "--cdp-endpoint", "wss://your-railway-url.up.railway.app?token=YOUR_TOKEN"
-      ]
-    }
-  }
-}
-```
+**For CLI/Desktop users**, skip the MCP server deployment and just use the `npx` config pointing at your self-hosted Browserless URL.
 
 ---
 
-### Path D: Local Docker (for testing, requires terminal + Docker)
+### Path D: Local Docker (for testing)
 
-> Requires a terminal with Docker installed. Skip this if you only use Claude Code in the browser.
-
-Spin up Browserless locally to test before deploying.
+> Requires Docker. Good for testing before deploying.
 
 ```bash
 git clone https://github.com/ankurtyagi2007-tech/Claude-Eyes.git
@@ -179,7 +206,7 @@ docker-compose up -d
 ./scripts/health-check.sh http://localhost:3000 local-dev-token
 ```
 
-MCP config for local:
+MCP config for local (CLI/Desktop only):
 
 ```json
 {
@@ -194,49 +221,6 @@ MCP config for local:
   }
 }
 ```
-
----
-
-## MCP Configuration
-
-### Claude Code CLI
-
-Copy `examples/mcp-config-claude-code.json` and update the endpoint URL and token. Then either:
-
-- Add it to your project's `.mcp.json` file, or
-- Add it to your global Claude Code MCP config at `~/.claude/mcp.json`
-
-### Claude Desktop
-
-Copy `examples/mcp-config-claude-desktop.json` into your Claude Desktop config file:
-
-- macOS: `~/Library/Application Support/Claude/claude_desktop_config.json`
-- Windows: `%APPDATA%\Claude\claude_desktop_config.json`
-
-### Claude Code in Browser (claude.ai/code)
-
-Browser sessions run in an ephemeral sandbox. Files like `~/.claude/mcp.json` or `.mcp.json` written during a session are destroyed when the session ends. You must add the MCP server through the **settings UI** so it persists on your account.
-
-**Step-by-step:**
-
-1. Open [claude.ai/code](https://claude.ai/code) in your browser
-2. Click the **hamburger menu** (three lines, top-left) or open **Settings**
-3. Navigate to **MCP Servers** (sometimes under "Integrations" or "Tools")
-4. Click **Add MCP Server** (or "Add Custom Server")
-5. Fill in the fields:
-   - **Name:** `cloud-eyes`
-   - **Command:** `npx`
-   - **Arguments:** `-y`, `@playwright/mcp@latest`, `--cdp-endpoint`, `wss://production-sfo.browserless.io/chromium/playwright?token=YOUR_BROWSERLESS_TOKEN`
-6. Save
-
-The server is now tied to your **account**, not to a session or project. Every new session in any repo will have the Playwright tools available.
-
-**Verify it worked:** Start a new session and look for tools like `playwright_navigate`, `playwright_screenshot`, `playwright_click` in the available tools. If they are there, say "audit my website at https://your-site.com" and it will work.
-
-**Common mistakes:**
-- Writing `~/.claude/mcp.json` inside a browser session - this file is destroyed when the session ends
-- Writing `.mcp.json` in a project directory during a browser session - same problem, the sandbox is ephemeral
-- Adding the config through Claude asking you to "create a file" instead of through the settings UI
 
 ---
 
@@ -264,7 +248,7 @@ This loop runs automatically after every frontend change when CLAUDE.md is loade
 After deploying, verify everything works:
 
 ```bash
-# Health check
+# Health check (Browserless)
 ./scripts/health-check.sh https://cloud-eyes.fly.dev YOUR_TOKEN
 
 # Full visual audit test
@@ -288,6 +272,7 @@ A cloud browser is powerful. Lock it down.
 - **Set timeouts**. The default `TIMEOUT=60000` (60s) kills hung sessions. Do not disable this.
 - **Network isolation**. If your cloud browser only needs to reach specific domains, configure network policies at the infrastructure level (Fly.io private networking, Railway private services, firewall rules).
 - **Do not expose port 3000 publicly without token auth**. The Browserless image requires a token by default. Do not override this behavior.
+- **MCP server access**. Anyone who discovers your MCP server URL can use your cloud browser. Consider adding authentication via the OAuth fields in the custom connector settings, or restrict access at the infrastructure level.
 
 ---
 
@@ -297,13 +282,16 @@ A cloud browser is powerful. Lock it down.
 cloud-eyes/
   README.md                          # This file
   CLAUDE.md                          # Visual audit skill for Claude Code
-  Dockerfile                         # Browserless Chromium with defaults
+  Dockerfile                         # Browserless Chromium (cloud browser)
+  Dockerfile.mcp                     # Playwright MCP Server (HTTP/SSE bridge)
   docker-compose.yml                 # Local development setup
-  fly.toml                           # Fly.io deployment config
+  fly.toml                           # Fly.io config for Browserless
+  fly.mcp.toml                       # Fly.io config for MCP server
   railway.json                       # Railway deployment config
   scripts/
-    deploy-fly.sh                    # One-command Fly.io deploy
-    deploy-railway.sh                # One-command Railway deploy
+    deploy-fly.sh                    # Deploy Browserless to Fly.io
+    deploy-mcp-fly.sh               # Deploy MCP server to Fly.io
+    deploy-railway.sh                # Deploy Browserless to Railway
     health-check.sh                  # Verify cloud browser is running
     test-visual-audit.sh             # End-to-end screenshot test
   examples/
